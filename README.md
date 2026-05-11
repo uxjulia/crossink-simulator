@@ -37,6 +37,8 @@ No scripts need to be copied into the firmware repo for the simulator to build. 
 
 Keep the sample `build_src_filter` exclusions unless your firmware has already moved those files behind simulator guards. In the current CrossPoint/CrossInk layout, the simulator library supplies the host-side file-transfer and update shims while the lower-level `WebServer`, `WebSocketsServer`, and `NetworkClient` shims let shared network routes run on the desktop build.
 
+By default, the simulator keeps its own `JPEGDEC`, `PNGdec`, and QRCode compatibility shims so existing firmware projects can update this library without changing their simulator environment. To test against the native decoder libraries instead, follow the opt-in comments in the sample PlatformIO files: define `CROSSPOINT_SIM_USE_NATIVE_DECODERS`, set `lib_compat_mode = off`, change simulator `lib_ignore` to `hal, WebSockets`, and add the native `PNGdec`/`JPEGDEC` dependencies. `WebSockets` is ignored only in native simulator builds because this repo supplies the host-backed `WebSocketsServer` implementation.
+
 If you only want a self-contained simulator dependency, stop there.
 
 If you also want the `Run Simulator` task to appear in the consuming repo's PlatformIO IDE task list (under the "Custom" folder), let the consuming project own the IDE task registration. Add `custom_run_simulator_target_owner = project` to `[env:simulator]`, then add one project-level hook:
@@ -144,11 +146,13 @@ locking semantics.
 the simulator. The simulator stubs those update paths so the UI can be opened
 without flashing firmware or changing boot partitions.
 
-**Image previews**: The simulator decodes JPEG and PNG files on the host and
-renders a rough grayscale preview through the firmware's normal image callbacks.
-This is meant to make image pages and PNG sleep overlays visible while testing
-desktop flows. It does not simulate device-specific e-ink image quality,
-refresh behaviour, or memory pressure.
+**Image previews**: The default simulator shims decode JPEG and PNG files on the
+host and render a rough grayscale preview through the firmware's normal image
+callbacks. This is meant to make image pages and PNG sleep overlays visible
+while testing desktop flows. Native decoder libraries can be enabled with the
+sample config's opt-in flags when decoder compatibility matters more than the
+self-contained default. Neither mode simulates device-specific e-ink image
+quality, refresh behaviour, or memory pressure.
 
 **Cache**: On first open of an ebook, an "Indexing..." popup will appear while the section cache is built. If you see rendering issues after a code change that affects layout, delete `./fs_/.crosspoint/` to clear stale caches.
 

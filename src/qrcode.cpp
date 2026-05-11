@@ -14,8 +14,9 @@ uint32_t qrcode_getBufferSize(uint8_t version) {
 
 int8_t qrcode_initText(QRCode *qrcode, uint8_t * /*modules*/, uint8_t version,
                        QrCodeEcc /*ecc*/, const char * /*data*/) {
-  if (qrcode)
+  if (qrcode) {
     qrcode->size = version * 4 + 17;
+  }
   return 0;
 }
 

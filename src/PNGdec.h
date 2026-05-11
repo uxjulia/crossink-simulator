@@ -1,4 +1,17 @@
 #pragma once
+
+#if defined(CROSSPOINT_SIM_USE_NATIVE_DECODERS)
+#if defined(__has_include_next)
+#if __has_include_next(<PNGdec.h>)
+#include_next <PNGdec.h>
+#else
+#error "CROSSPOINT_SIM_USE_NATIVE_DECODERS requires PNGdec in this PlatformIO environment"
+#endif
+#else
+#include_next <PNGdec.h>
+#endif
+
+#else
 // Simulator implementation for the PNGdec API shape used by firmware.
 // It decodes on the host with stb_image and feeds RGBA rows through the same
 // draw callback contract as bitbank2/PNGdec. This is a preview aid, not a
@@ -118,3 +131,4 @@ private:
   simulator_image::DecodedImage image_;
   PNG_DRAW_CALLBACK drawCb_{nullptr};
 };
+#endif

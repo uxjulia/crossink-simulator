@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-// Dummy QR code library for simulator
+// Dummy QR code library for simulator.
 enum QrCodeEcc { ECC_LOW = 0, ECC_MEDIUM, ECC_QUARTILE, ECC_HIGH };
 
 class QRCode {

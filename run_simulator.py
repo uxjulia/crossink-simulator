@@ -3,11 +3,11 @@ PlatformIO library build script for the Crosspoint Simulator.
 
 Handles two things automatically when this lib is included as a lib_dep:
 
-1. Patches BookMetadataCache — SpineEntry::cumulativeSize and its fast read
+1. Patches BookMetadataCache -- SpineEntry::cumulativeSize and its fast read
    path can use size_t, which is 8 bytes on 64-bit hosts (macOS/Linux) but
    4 bytes on ESP32-C3. This mismatch breaks binary cache serialization in the
    simulator. Replaced with uint32_t, which is the correct explicit size on both
-   platforms. Applied idempotently — safe to run on every build.
+   platforms. Applied idempotently -- safe to run on every build.
 
 2. Registers a backward-compatible "run_simulator" custom target.
 

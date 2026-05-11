@@ -1,4 +1,17 @@
 #pragma once
+
+#if defined(CROSSPOINT_SIM_USE_NATIVE_DECODERS)
+#if defined(__has_include_next)
+#if __has_include_next(<JPEGDEC.h>)
+#include_next <JPEGDEC.h>
+#else
+#error "CROSSPOINT_SIM_USE_NATIVE_DECODERS requires JPEGDEC in this PlatformIO environment"
+#endif
+#else
+#include_next <JPEGDEC.h>
+#endif
+
+#else
 // Simulator implementation for the JPEGDEC API shape used by firmware.
 // It decodes on the host with stb_image and feeds grayscale rows through the
 // same draw callback contract as bitbank2/JPEGDEC. This is a preview aid, not
@@ -152,3 +165,4 @@ private:
   void *user_{nullptr};
   int lastError_{0};
 };
+#endif
