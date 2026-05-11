@@ -2,6 +2,7 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <cstdarg>
 #include <cstdint>
 #include <string>
 #include <thread>
@@ -11,20 +12,24 @@
 #define IRAM_ATTR
 #define DRAM_ATTR
 #define RTC_NOINIT_ATTR
-#define PGM_P const char*
+#define PGM_P const char *
 #define PSTR(s) (s)
 
 inline unsigned long millis() {
   using namespace std::chrono;
-  return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+  static const auto start = steady_clock::now();
+  return duration_cast<milliseconds>(steady_clock::now() - start).count();
 }
 
 inline unsigned long micros() {
   using namespace std::chrono;
-  return duration_cast<microseconds>(system_clock::now().time_since_epoch()).count();
+  static const auto start = steady_clock::now();
+  return duration_cast<microseconds>(steady_clock::now() - start).count();
 }
 
-inline void delay(unsigned long ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
+inline void delay(unsigned long ms) {
+  std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
 inline void yield() { std::this_thread::yield(); }
 
 #include "HardwareSerial.h"
