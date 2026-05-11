@@ -3,9 +3,11 @@ PlatformIO library build script for the Crosspoint Simulator.
 
 Handles two things automatically when this lib is included as a lib_dep:
 
-1. Ensures every dependency directory in `$PROJECT_LIBDEPS_DIR/$PIOENV` has a
-   `library.json` file when only `library.properties` is present. This avoids
-   PlatformIO warnings from incompatible libraries.
+1. Patches BookMetadataCache -- SpineEntry::cumulativeSize and its fast read
+   path can use size_t, which is 8 bytes on 64-bit hosts (macOS/Linux) but
+   4 bytes on ESP32-C3. This mismatch breaks binary cache serialization in the
+   simulator. Replaced with uint32_t, which is the correct explicit size on both
+   platforms. Applied idempotently -- safe to run on every build.
 
 2. Registers a backward-compatible "run_simulator" custom target.
 
@@ -20,63 +22,88 @@ when multiple registration paths exist.
 
 Import("env")
 import os
-import json
 import builtins
 
 RUN_SIMULATOR_TARGET_KEY = "_crosspoint_run_simulator_target_registered"
 RUN_SIMULATOR_TARGET_OWNER_OPTION = "custom_run_simulator_target_owner"
 
 
+# --- BookMetadataCache patch ---
 
-RESET = "\x1b[0m"
-BLUE = "\x1b[34m"
-GREEN = "\x1b[32m"
-YELLOW = "\x1b[33m"
-RED = "\x1b[31m"
+def _patch_book_metadata_cache(env):
+    header = os.path.join(
+        env["PROJECT_DIR"], "lib", "Epub", "Epub", "BookMetadataCache.h"
+    )
+    if os.path.isfile(header):
+        _apply_header_patch(header)
 
-PREFIX = "[SIMULATOR BUILD]"
+    source = os.path.join(
+        env["PROJECT_DIR"], "lib", "Epub", "Epub", "BookMetadataCache.cpp"
+    )
+    if os.path.isfile(source):
+        _apply_source_patch(source)
 
-lib_path = os.path.join(env["PROJECT_LIBDEPS_DIR"], env["PIOENV"])
 
-def color_print(prefix, message, color=BLUE):
-    print(f"{prefix} {color}{message}{RESET}")
+def _apply_header_patch(filepath):
+    with open(filepath, "r") as f:
+        content = f.read()
 
-def _ensure_library_json_files(lib_path):
-    color_print(PREFIX, f"Scanning library dependencies in: {lib_path}", BLUE)
-    if not os.path.isdir(lib_path):
-        color_print(PREFIX, "Library path not found, skipping library.json generation.", RED)
-        return
+    original = content
 
-    for lib_name in sorted(os.listdir(lib_path)):
-        lib_dir = os.path.join(lib_path, lib_name)
-        if not os.path.isdir(lib_dir):
-            color_print(PREFIX, f"Skipping non-directory entry: {lib_name}", RESET)
-            continue
+    # lutOffset is a member variable written as uint32_t in buildBookBin but
+    # declared as size_t, which is 8 bytes on 64-bit hosts. load() reads
+    # sizeof(lutOffset) bytes, so an 8-byte read shifts the file position and
+    # corrupts the spineCount/tocCount fields that follow.
+    content = content.replace(
+        "  size_t lutOffset;",
+        "  uint32_t lutOffset; // simulator patch",
+        1,
+    )
 
-        color_print(PREFIX, f"Checking library: {lib_name}", BLUE)
-        json_path = os.path.join(lib_dir, "library.json")
-        if os.path.isfile(json_path):
-            color_print(PREFIX, f" library.json exists, skipping: {lib_name}", GREEN)
-            continue
+    content = content.replace(
+        "    size_t cumulativeSize;",
+        "    uint32_t cumulativeSize; // simulator patch",
+        1,
+    )
+    content = content.replace("const size_t cumulativeSize", "const uint32_t cumulativeSize")
 
-        prop_path = os.path.join(lib_dir, "library.properties")
-        if not os.path.isfile(prop_path):
-            color_print(PREFIX, f" no library.properties found, skipping: {lib_name}", YELLOW)
-            continue
+    if content == original:
+        return  # nothing to patch
 
-        library_data = {
-            "name": lib_name,
-            "version": "1.0.0",
-            "frameworks": "*"
-        }
+    with open(filepath, "w") as f:
+        f.write(content)
+    print("Patched BookMetadataCache header: size_t -> uint32_t for simulator: %s" % filepath)
 
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(library_data, f, indent=4)
-            f.write("\n")
 
-        color_print(PREFIX, f" Created library.json for {lib_name}", GREEN)
+def _apply_source_patch(filepath):
+    with open(filepath, "r") as f:
+        content = f.read()
 
-_ensure_library_json_files(lib_path)
+    original = content
+
+    # getSpineCumulativeSize() skips directly to the stored cumulativeSize
+    # field. Once the header is patched, that field is a 4-byte uint32_t; the
+    # fast read path must use the same width or a 64-bit host will over-read
+    # into the following tocIndex bytes and inflate book progress.
+    content = content.replace(
+        "  size_t cumulativeSize = 0;\n"
+        "  serialization::readPod(bookFile, cumulativeSize);\n"
+        "  return cumulativeSize;",
+        "  uint32_t cumulativeSize = 0; // simulator patch\n"
+        "  serialization::readPod(bookFile, cumulativeSize);\n"
+        "  return cumulativeSize;",
+        1,
+    )
+
+    if content == original:
+        return  # nothing to patch
+
+    with open(filepath, "w") as f:
+        f.write(content)
+    print("Patched BookMetadataCache source: size_t -> uint32_t for simulator: %s" % filepath)
+
+
+_patch_book_metadata_cache(env)
 
 
 # --- run_simulator custom target ---

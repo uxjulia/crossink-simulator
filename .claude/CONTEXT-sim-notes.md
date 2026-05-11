@@ -8,7 +8,7 @@ The repo ships as a PlatformIO library; downstream firmware adds it as a `lib_de
 
 ## Current State
 
-The simulator builds and runs on macOS and Linux/WSL. Portrait orientation is correct, gray shading renders cleanly at HiDPI, file browsing lists EPUBs from `./fs_/books/`, and reading a book shows the "Indexing..." popup on first open before rendering pages. Window close exits cleanly. Icons render in the UI (drawImage / drawImageTransparent are now implemented, not stubs). JPEG and PNG decoder shims render rough host-side previews for EPUB images and PNG sleep overlays. HalGPIO carries a DeviceType (X4 default, X3 selectable) so downstream code branching on device type compiles in the simulator. Host-backed web shims cover `WebServer`, `WebSocketsServer`, and `NetworkClient`, with firmware port 80 exposed on `http://127.0.0.1:8080/` and port 81 WebSockets exposed on `ws://127.0.0.1:8081/`.
+The simulator builds and runs on macOS and Linux/WSL. Portrait orientation is correct, gray shading renders cleanly at HiDPI, file browsing lists EPUBs from `./fs_/books/`, and reading a book shows the "Indexing..." popup on first open before rendering pages. Window close exits cleanly. Icons render in the UI (drawImage / drawImageTransparent are now implemented, not stubs). JPEG and PNG decoder shims render rough host-side previews for EPUB images and PNG sleep overlays by default; native `PNGdec`/`JPEGDEC` can be enabled explicitly with `CROSSPOINT_SIM_USE_NATIVE_DECODERS`, `lib_compat_mode = off`, and simulator `lib_ignore = hal, WebSockets`. HalGPIO carries a DeviceType (X4 default, X3 selectable) so downstream code branching on device type compiles in the simulator. Host-backed web shims cover `WebServer`, `WebSocketsServer`, and `NetworkClient`, with firmware port 80 exposed on `http://127.0.0.1:8080/` and port 81 WebSockets exposed on `ws://127.0.0.1:8081/`.
 
 ## Setup
 
@@ -26,7 +26,8 @@ Linux/WSL needs OpenSSL because [MD5Builder_linux.h](src/MD5Builder_linux.h) wra
 1. Copy [sample-platformio-macos.ini](sample-platformio-macos.ini) or [sample-platformio-linux-wsl.ini](sample-platformio-linux-wsl.ini) contents into the firmware's `platformio.ini` as a new `[env:simulator]` block.
 2. For local dev, replace the git ref with a symlink: `simulator=symlink://../crosspoint-simulator`.
 3. Optional: if you want PlatformIO's IDE task list to show `Run Simulator`, add `custom_run_simulator_target_owner = project` and the `post:` hook shown in [README.md](README.md). Do not copy [run_simulator.py](run_simulator.py) into the firmware repo; it is auto-loaded from this library through [library.json](library.json).
-4. Place EPUBs at `./fs_/books/` (relative to the binary's working directory). This maps to SD card path `/books/`.
+4. Optional native decoder mode: add `-DCROSSPOINT_SIM_USE_NATIVE_DECODERS`, set `lib_compat_mode = off`, use `lib_ignore = hal, WebSockets`, and add the native `PNGdec`/`JPEGDEC` dependencies shown in the sample comments.
+5. Place EPUBs at `./fs_/books/` (relative to the binary's working directory). This maps to SD card path `/books/`.
 
 **Build and run**
 
@@ -100,7 +101,7 @@ pio run -e simulator -t run_simulator
 
 ### Host-side image decoder previews (2026-05-08)
 
-- [src/JPEGDEC.h](src/JPEGDEC.h) and [src/PNGdec.h](src/PNGdec.h) now decode via vendored [src/stb_image.h](src/stb_image.h), then feed grayscale/RGBA rows through the same callback shape used by the embedded libraries. This is only a desktop preview path; it does not model e-ink waveforms, device memory pressure, or exact image quality.
+- [src/JPEGDEC.h](src/JPEGDEC.h) and [src/PNGdec.h](src/PNGdec.h) decode via vendored [src/stb_image.h](src/stb_image.h) by default, then feed grayscale/RGBA rows through the same callback shape used by the embedded libraries. With `CROSSPOINT_SIM_USE_NATIVE_DECODERS`, those headers pass through to the native PlatformIO `JPEGDEC`/`PNGdec` dependencies instead. Both paths are desktop preview paths; neither models e-ink waveforms, device memory pressure, or exact image quality.
 
 ### Host-backed web server shims (2026-05-10)
 
