@@ -22,7 +22,7 @@ class HalTiltSensor {
 
  public:
   void begin() {
-#ifdef FORCE_TILT_SENSOR_AVAILABLE
+#if defined(FORCE_TILT_SENSOR_AVAILABLE) || defined(FORCE_DEVICE_X3) || defined(SIMULATOR_DEVICE_X3)
     _available = true;
 #else
     _available = false;
