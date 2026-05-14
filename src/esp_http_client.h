@@ -15,6 +15,12 @@ enum esp_http_client_method_t {
   HTTP_METHOD_PUT,
 };
 
+enum esp_http_client_auth_type_t {
+  HTTP_AUTH_TYPE_NONE = 0,
+  HTTP_AUTH_TYPE_BASIC,
+  HTTP_AUTH_TYPE_DIGEST,
+};
+
 struct SimEspHttpClient;
 typedef SimEspHttpClient *esp_http_client_handle_t;
 
@@ -39,6 +45,9 @@ struct esp_http_client_config_t {
   bool skip_cert_common_name_check = false;
   esp_err_t (*crt_bundle_attach)(void *conf) = nullptr;
   bool keep_alive_enable = false;
+  const char *username = nullptr;
+  const char *password = nullptr;
+  esp_http_client_auth_type_t auth_type = HTTP_AUTH_TYPE_NONE;
 };
 
 struct SimEspHttpClient {
