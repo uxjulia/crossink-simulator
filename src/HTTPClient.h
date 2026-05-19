@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "SimHttpFetch.h"
@@ -12,7 +14,7 @@ class NetworkClient;
 enum { HTTPC_STRICT_FOLLOW_REDIRECTS, HTTP_CODE_OK = 200 };
 
 class HTTPClient {
- public:
+public:
   HTTPClient() {}
   ~HTTPClient() {}
 
@@ -20,9 +22,13 @@ class HTTPClient {
     (void)client;
     url_ = url ? url : "";
     responseBody_.s.clear();
+    responseStream_.reset();
     statusCode_ = 0;
   }
-  void setFollowRedirects(int mode) {}
+  void setFollowRedirects(int mode) { (void)mode; }
+  void setReuse(bool reuse) { (void)reuse; }
+  void setConnectTimeout(int32_t timeout) { (void)timeout; }
+  void setTimeout(uint16_t timeout) { (void)timeout; }
   void addHeader(const char *name, const String &value) {
     if (name)
       headers_[name] = value.c_str();
@@ -44,6 +50,14 @@ class HTTPClient {
 
   String getString() { return responseBody_; }
   int getSize() { return static_cast<int>(responseBody_.length()); }
+  Stream *getStreamPtr() {
+    if (!responseStream_)
+      responseStream_ = std::make_unique<ResponseBodyStream>(responseBody_);
+    return responseStream_.get();
+  }
+  bool connected() {
+    return responseStream_ ? responseStream_->available() > 0 : statusCode_ > 0;
+  }
   int writeToStream(Stream *stream) {
     if (!stream)
       return 0;
@@ -57,14 +71,49 @@ class HTTPClient {
     headers_.clear();
     basicAuth_.clear();
     responseBody_ = "";
+    responseStream_.reset();
     statusCode_ = 0;
   }
 
- private:
+  static String errorToString(int error) {
+    return String(std::to_string(error));
+  }
+
+private:
+  class ResponseBodyStream final : public Stream {
+  public:
+    explicit ResponseBodyStream(const String &body) : body_(body.s) {}
+
+    int available() override {
+      return position_ < body_.size()
+                 ? static_cast<int>(body_.size() - position_)
+                 : 0;
+    }
+    int read() override {
+      if (position_ >= body_.size())
+        return -1;
+      return static_cast<uint8_t>(body_[position_++]);
+    }
+    int peek() override {
+      if (position_ >= body_.size())
+        return -1;
+      return static_cast<uint8_t>(body_[position_]);
+    }
+    size_t write(uint8_t value) override {
+      (void)value;
+      return 0;
+    }
+
+  private:
+    std::string body_;
+    size_t position_ = 0;
+  };
+
   std::string url_;
   std::map<std::string, std::string> headers_;
   std::string basicAuth_;
   String responseBody_;
+  std::unique_ptr<ResponseBodyStream> responseStream_;
   int statusCode_ = 0;
 
   int perform(const char *method, const char *body) {
@@ -72,10 +121,12 @@ class HTTPClient {
       return 0;
 
     sim_http_fetch::Response response;
-    if (!sim_http_fetch::fetch(url_, method, headers_, basicAuth_, body, response))
+    if (!sim_http_fetch::fetch(url_, method, headers_, basicAuth_, body,
+                               response))
       return 0;
 
     responseBody_ = response.body;
+    responseStream_.reset();
     statusCode_ = response.statusCode;
     return statusCode_;
   }

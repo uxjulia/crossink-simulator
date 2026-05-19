@@ -48,5 +48,6 @@ private:
 
 class NetworkClientSecure : public NetworkClient {
 public:
+  void setHandshakeTimeout(uint32_t seconds) { (void)seconds; }
   void setInsecure() {}
 };
