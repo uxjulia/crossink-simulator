@@ -67,9 +67,6 @@ public:
   void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows);
   bool supportsStripGrayscale() const;
 
-  // Simulator only: keep SDL window rotation in sync with GfxRenderer
-  // orientation.
-  void setSimulatorOrientation(int orientation);
   // Simulator only: call from main thread to push rendered pixels to SDL.
   void presentIfNeeded();
   // Simulator only: returns true once a hard shutdown has been requested.

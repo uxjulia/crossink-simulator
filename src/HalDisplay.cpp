@@ -24,14 +24,8 @@ static std::atomic<bool> pendingPresent{false};
 // shouldQuit().
 std::atomic<bool> quitRequested{false};
 
-static std::atomic<int> currentOrientation{
-    static_cast<int>(GfxRenderer::Portrait)};
 static int currentWindowWidth = 0;
 static int currentWindowHeight = 0;
-
-static GfxRenderer::Orientation getCurrentOrientation() {
-  return static_cast<GfxRenderer::Orientation>(currentOrientation.load());
-}
 
 static bool isPortraitOrientation(GfxRenderer::Orientation orientation) {
   return orientation == GfxRenderer::Portrait ||
@@ -63,10 +57,6 @@ static void applyWindowGeometryIfNeeded(GfxRenderer::Orientation orientation) {
   currentWindowHeight = winH;
 }
 
-void HalDisplay::setSimulatorOrientation(int o) {
-  currentOrientation.store(o);
-}
-
 HalDisplay::HalDisplay() {}
 HalDisplay::~HalDisplay() {}
 
@@ -85,7 +75,8 @@ void HalDisplay::begin() {
 
   int winW = 0;
   int winH = 0;
-  getLogicalWindowSize(getCurrentOrientation(), &winW, &winH);
+  extern GfxRenderer renderer;
+  getLogicalWindowSize(renderer.getOrientation(), &winW, &winH);
 
   // SDL_WINDOW_ALLOW_HIGHDPI lets the renderer use full Retina/HiDPI pixels on
   // macOS so we get crisp 1:1 rendering instead of a blurry upscale.
@@ -183,7 +174,8 @@ void HalDisplay::presentIfNeeded() {
   if (!texture || !sdl_renderer)
     return;
 
-  const GfxRenderer::Orientation orientation = getCurrentOrientation();
+  extern GfxRenderer renderer;
+  const GfxRenderer::Orientation orientation = renderer.getOrientation();
   applyWindowGeometryIfNeeded(orientation);
 
   SDL_UpdateTexture(texture, nullptr, pixelBuf,
