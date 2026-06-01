@@ -11,7 +11,36 @@
 
 class NetworkClient;
 
+#define HTTPC_ERROR_CONNECTION_REFUSED  (-1)
+#define HTTPC_ERROR_SEND_HEADER_FAILED  (-2)
+#define HTTPC_ERROR_SEND_PAYLOAD_FAILED (-3)
+#define HTTPC_ERROR_NOT_CONNECTED       (-4)
+#define HTTPC_ERROR_CONNECTION_LOST     (-5)
+#define HTTPC_ERROR_NO_STREAM           (-6)
+#define HTTPC_ERROR_NO_HTTP_SERVER      (-7)
+#define HTTPC_ERROR_TOO_LESS_RAM        (-8)
+#define HTTPC_ERROR_ENCODING            (-9)
+#define HTTPC_ERROR_STREAM_WRITE        (-10)
+#define HTTPC_ERROR_READ_TIMEOUT        (-11)
+
 enum { HTTPC_STRICT_FOLLOW_REDIRECTS, HTTP_CODE_OK = 200 };
+
+inline int simCurlExitCodeToHttpError(int curlExitCode) {
+  switch (curlExitCode) {
+  case 6:
+    return HTTPC_ERROR_NO_HTTP_SERVER;
+  case 7:
+    return HTTPC_ERROR_CONNECTION_REFUSED;
+  case 28:
+    return HTTPC_ERROR_READ_TIMEOUT;
+  case 52:
+  case 55:
+  case 56:
+    return HTTPC_ERROR_CONNECTION_LOST;
+  default:
+    return HTTPC_ERROR_CONNECTION_REFUSED;
+  }
+}
 
 class HTTPClient {
 public:
@@ -76,7 +105,32 @@ public:
   }
 
   static String errorToString(int error) {
-    return String(std::to_string(error));
+    switch (error) {
+    case HTTPC_ERROR_CONNECTION_REFUSED:
+      return String("connection refused");
+    case HTTPC_ERROR_SEND_HEADER_FAILED:
+      return String("send header failed");
+    case HTTPC_ERROR_SEND_PAYLOAD_FAILED:
+      return String("send payload failed");
+    case HTTPC_ERROR_NOT_CONNECTED:
+      return String("not connected");
+    case HTTPC_ERROR_CONNECTION_LOST:
+      return String("connection lost");
+    case HTTPC_ERROR_NO_STREAM:
+      return String("no stream");
+    case HTTPC_ERROR_NO_HTTP_SERVER:
+      return String("no HTTP server");
+    case HTTPC_ERROR_TOO_LESS_RAM:
+      return String("too less ram");
+    case HTTPC_ERROR_ENCODING:
+      return String("Transfer-Encoding not supported");
+    case HTTPC_ERROR_STREAM_WRITE:
+      return String("Stream write error");
+    case HTTPC_ERROR_READ_TIMEOUT:
+      return String("read Timeout");
+    default:
+      return String(std::to_string(error));
+    }
   }
 
 private:
@@ -121,9 +175,12 @@ private:
       return 0;
 
     sim_http_fetch::Response response;
-    if (!sim_http_fetch::fetch(url_, method, headers_, basicAuth_, body,
-                               response))
-      return 0;
+    if (!sim_http_fetch::fetch(url_, method, headers_, basicAuth_, body, response)) {
+      responseBody_ = "";
+      responseStream_.reset();
+      statusCode_ = 0;
+      return simCurlExitCodeToHttpError(response.curlExitCode);
+    }
 
     responseBody_ = response.body;
     responseStream_.reset();

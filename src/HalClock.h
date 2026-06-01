@@ -18,5 +18,7 @@ public:
   bool formatTime(char *buf, size_t bufSize,
                   uint8_t utcOffsetQuarterHoursBiased = 48,
                   bool use12Hour = false) const;
+  bool formatDate(char *buf, size_t bufSize,
+                  uint8_t utcOffsetQuarterHoursBiased = 48) const;
   bool syncFromNTP();
 };

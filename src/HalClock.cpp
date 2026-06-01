@@ -64,4 +64,39 @@ bool HalClock::formatTime(char *buf, size_t bufSize,
   return true;
 }
 
+bool HalClock::formatDate(char *buf, size_t bufSize,
+                          uint8_t utcOffsetQuarterHoursBiased) const {
+  if (bufSize < 13u || !_available)
+    return false;
+
+  if (utcOffsetQuarterHoursBiased > 104)
+    utcOffsetQuarterHoursBiased = 104;
+  const int offsetQuarterHours =
+      static_cast<int>(utcOffsetQuarterHoursBiased) - 48;
+  const std::time_t now =
+      std::time(nullptr) + static_cast<std::time_t>(offsetQuarterHours) * 15 * 60;
+  std::tm utcTime{};
+#if defined(_WIN32)
+  gmtime_s(&utcTime, &now);
+#else
+  gmtime_r(&now, &utcTime);
+#endif
+  if (std::strftime(buf, bufSize, "%b %e, %Y", &utcTime) == 0)
+    return false;
+  if (buf[0] != '\0') {
+    for (char *p = buf; *p != '\0'; ++p) {
+      if (*p == ' ' && *(p + 1) == ' ') {
+        ++p;
+        while (*p != '\0') {
+          *(p - 1) = *p;
+          ++p;
+        }
+        *(p - 1) = '\0';
+        break;
+      }
+    }
+  }
+  return true;
+}
+
 bool HalClock::syncFromNTP() { return _available; }

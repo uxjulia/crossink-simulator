@@ -9,12 +9,14 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace sim_http_fetch {
 
 struct Response {
   int statusCode = 0;
+  int curlExitCode = 0;
   std::string body;
 };
 
@@ -215,6 +217,8 @@ inline bool fetchWithCurl(const std::string &url, const char *method,
     statusText += statusBuffer.data();
   }
   const int rc = pclose(pipe);
+  if (rc >= 0 && WIFEXITED(rc))
+    out.curlExitCode = WEXITSTATUS(rc);
 
   bool readOk = readFile(tmpTemplate, out.body);
   unlink(tmpTemplate);
