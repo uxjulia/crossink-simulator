@@ -25,7 +25,19 @@
 #include <unordered_map>
 #include <vector>
 
+#if __has_include(<AppVersion.h>)
+#include <AppVersion.h>
+#endif
+
 #include "network/CrossPointWebServer.h"
+
+#ifndef CROSSPOINT_VERSION
+#ifdef CROSSINK_VERSION
+#define CROSSPOINT_VERSION CROSSINK_VERSION
+#else
+#define CROSSPOINT_VERSION "dev-simulator"
+#endif
+#endif
 
 namespace {
 constexpr int SIMULATOR_WEB_PORT = 8080;

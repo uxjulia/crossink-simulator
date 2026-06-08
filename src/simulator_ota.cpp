@@ -12,11 +12,7 @@
 
 bool OtaUpdater::isUpdateNewer() const { return false; }
 const std::string &OtaUpdater::getLatestVersion() const {
-#ifdef CROSSINK_VERSION
-  static const std::string version = CROSSINK_VERSION;
-#else
-  static const std::string version = CROSSPOINT_VERSION;
-#endif
+  static const std::string version = "dev-simulator";
   return version;
 }
 
@@ -27,7 +23,8 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
 
 #ifdef CROSSINK_VERSION
 OtaUpdater::OtaUpdaterError
-OtaUpdater::installUpdate(ProgressCallback onProgress, void *ctx, std::atomic<bool> *cancelRequested) {
+OtaUpdater::installUpdate(ProgressCallback onProgress, void *ctx,
+                          std::atomic<bool> *cancelRequested) {
   LOG_DBG("OTA", "[SIM] OTA install is not supported in the native simulator");
   processedSize = 1;
   totalSize = 1;
@@ -38,7 +35,8 @@ OtaUpdater::installUpdate(ProgressCallback onProgress, void *ctx, std::atomic<bo
   return INTERNAL_UPDATE_ERROR;
 }
 #else
-OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgress, void *ctx) {
+OtaUpdater::OtaUpdaterError
+OtaUpdater::installUpdate(ProgressCallback onProgress, void *ctx) {
   LOG_DBG("OTA", "[SIM] OTA install is not supported in the native simulator");
   processedSize = 1;
   totalSize = 1;

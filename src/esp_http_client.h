@@ -7,7 +7,7 @@
 #include "esp_err.h"
 #include "SimHttpFetch.h"
 
-enum http_event { HTTP_EVENT_ON_DATA };
+enum http_event { HTTP_EVENT_ON_DATA, HTTP_EVENT_ON_HEADER };
 
 enum esp_http_client_method_t {
   HTTP_METHOD_GET,
@@ -30,6 +30,8 @@ struct esp_http_client_event_t {
   void *data;
   int data_len;
   void *user_data;
+  const char *header_key;
+  const char *header_value;
 };
 
 typedef esp_err_t (*http_event_handler_cb)(esp_http_client_event_t *evt);
@@ -44,6 +46,8 @@ struct esp_http_client_config_t {
   esp_http_client_method_t method = HTTP_METHOD_GET;
   bool skip_cert_common_name_check = false;
   esp_err_t (*crt_bundle_attach)(void *conf) = nullptr;
+  const char *cert_pem = nullptr;
+  int cert_len = 0;
   bool keep_alive_enable = false;
   const char *username = nullptr;
   const char *password = nullptr;
@@ -203,6 +207,17 @@ esp_http_client_is_complete_data_received(esp_http_client_handle_t handle) {
   if (!handle || !handle->opened)
     return false;
   return handle->bodyOffset >= handle->responseBody.size();
+}
+
+inline esp_err_t
+esp_http_client_get_and_clear_last_tls_error(esp_http_client_handle_t,
+                                             int *esp_tls_code,
+                                             int *esp_tls_flags) {
+  if (esp_tls_code)
+    *esp_tls_code = 0;
+  if (esp_tls_flags)
+    *esp_tls_flags = 0;
+  return ESP_OK;
 }
 
 inline esp_err_t esp_http_client_cleanup(esp_http_client_handle_t handle) {
