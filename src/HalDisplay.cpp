@@ -234,6 +234,11 @@ uint8_t *HalDisplay::getFrameBuffer() const {
 }
 
 void HalDisplay::copyGrayscaleBuffers(const uint8_t *, const uint8_t *) {}
+void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) {
+  displayBuffer(fallback, turnOffScreen);
+}
+void HalDisplay::preconditionGrayscale() {}
+void HalDisplay::preconditionGrayscale(uint16_t, uint16_t, uint16_t, uint16_t) {}
 void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t *) {}
 void HalDisplay::copyGrayscaleMsbBuffers(const uint8_t *) {}
 void HalDisplay::cleanupGrayscaleBuffers(const uint8_t *) {}
