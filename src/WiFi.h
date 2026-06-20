@@ -190,10 +190,12 @@ public:
                                          : IPAddress();
   }
   void persistent(bool) {}
-  void disconnect(bool wifioff = false, bool eraseap = false) {
+  bool disconnect(bool wifioff = false, bool eraseap = false, unsigned long timeout = 0) {
     (void)wifioff;
     (void)eraseap;
+    (void)timeout;
     currentStatus = WL_DISCONNECTED;
+    return true;
   }
   void mode(int mode) {
     currentMode = static_cast<wifi_mode_t>(mode);
