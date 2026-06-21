@@ -89,7 +89,26 @@ public:
     size_t last = s.find_last_not_of(" \t\n\r");
     s = s.substr(first, (last - first + 1));
   }
-  void replace(const char *, const char *) {}
+  void replace(char find, char replaceWith) {
+    for (char &c : s) {
+      if (c == find)
+        c = replaceWith;
+    }
+  }
+  void replace(const char *find, const char *replaceWith) {
+    if (!find || !*find)
+      return;
+    const std::string f(find);
+    const std::string r(replaceWith ? replaceWith : "");
+    size_t pos = 0;
+    while ((pos = s.find(f, pos)) != std::string::npos) {
+      s.replace(pos, f.size(), r);
+      pos += r.size();
+    }
+  }
+  void replace(const String &find, const String &replaceWith) {
+    replace(find.s.c_str(), replaceWith.s.c_str());
+  }
   bool isEmpty() const { return s.empty(); }
   size_t length() const { return s.length(); }
   const char *c_str() const { return s.c_str(); }
