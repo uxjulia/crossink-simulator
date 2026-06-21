@@ -4,6 +4,7 @@
 
 #include "Arduino.h"
 #include "HalDisplay.h"
+#include "HalGPIO.h"
 #include "SimulatorLifecycle.h"
 
 extern void setup();
@@ -14,6 +15,10 @@ int main(int argc, char **argv) {
   SimulatorLifecycle::initProcessArgs(argv);
   setup();
   while (!display.shouldQuit()) {
+    // Clear input edge latches once per frame. update() may be called many
+    // times within loop(); edges must survive across those calls and only
+    // reset here at the frame boundary.
+    gpio.beginFrame();
     loop();
     // SDL must be driven from the main thread on macOS.
     // The render task writes pixels and sets pendingPresent; we flush them

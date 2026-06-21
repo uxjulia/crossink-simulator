@@ -62,12 +62,25 @@ void HalGPIO::begin() {
 #endif
 }
 
-void HalGPIO::update() {
-  // Reset per-frame state
+void HalGPIO::beginFrame() {
+  // Clear the press/release edge latches once per frame. See update() for why
+  // this is deliberately separate from the SDL poll.
   for (int i = 0; i < NUM_BUTTONS; i++) {
     pressedThisFrame[i] = false;
     releasedThisFrame[i] = false;
   }
+}
+
+void HalGPIO::update() {
+  // Per-frame press/release edges are intentionally NOT cleared here; that
+  // happens once per frame in beginFrame(). The firmware calls update() several
+  // times within a single frame (e.g. CrossPointWebServerActivity polls input
+  // between handleClient() bursts, on top of the top-of-loop gpio.update() in
+  // main.cpp). If edges were cleared on every update(), a key press drained by
+  // an earlier update() would be wiped before a later update()'s wasPressed()
+  // check could observe it — which made Back/Exit require repeated presses.
+  // Latching edges for the whole frame keeps wasPressed() stable across all
+  // update() calls in that frame, matching the on-device InputManager.
 
   // HalGPIO owns all SDL event polling so keyboard and quit events are never
   // split between two callers (HalDisplay::presentIfNeeded only renders).

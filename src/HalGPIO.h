@@ -52,6 +52,10 @@ public:
   // Start button GPIO and setup SPI for screen and SD card
   void begin();
 
+  // Clears the per-frame press/release edge latches. Must be called exactly
+  // once per frame (before the firmware's loop()), NOT on every update().
+  void beginFrame();
+
   // Button input methods
   void update();
   bool isPressed(uint8_t buttonIndex) const;
