@@ -37,6 +37,7 @@ public:
   // Ensure a directory exists, creating it if necessary. Returns true on
   // success.
   bool ensureDirectoryExists(const char *path);
+  void installDateTimeCallback(const uint8_t *utcOffsetQuarterHoursBiased);
 
   HalFile open(const char *path, const oflag_t oflag = O_RDONLY);
   bool mkdir(const char *path, const bool pFlag = true);

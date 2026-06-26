@@ -428,6 +428,11 @@ bool HalStorage::writeFile(const char *path, const String &content) {
 }
 bool HalStorage::ensureDirectoryExists(const char *path) { return mkdir(path); }
 
+void HalStorage::installDateTimeCallback(
+    const uint8_t *utcOffsetQuarterHoursBiased) {
+  (void)utcOffsetQuarterHoursBiased;
+}
+
 bool HalStorage::openFileForRead(const char *moduleName, const char *path,
                                  HalFile &file) {
   file = open(path, O_RDONLY);

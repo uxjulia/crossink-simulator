@@ -96,7 +96,7 @@ inline bool readFile(const std::string &path, std::string &out) {
 }
 
 inline bool isDirectory(const std::string &path) {
-  struct stat st {};
+  struct stat st{};
   return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
 }
 
@@ -125,7 +125,8 @@ inline bool findFileByBasename(const std::string &dir, const std::string &name,
       return true;
     }
 
-    if (isDirectory(path) && findFileByBasename(path, name, outPath, depth + 1)) {
+    if (isDirectory(path) &&
+        findFileByBasename(path, name, outPath, depth + 1)) {
       closedir(handle);
       return true;
     }
@@ -153,13 +154,14 @@ inline bool fetchFromFileUrl(const std::string &url, Response &out) {
 }
 
 inline bool fetchFromMockRoot(const std::string &url, Response &out) {
-  const char *root = std::getenv("CROSSPOINT_SIM_HTTP_MOCK_ROOT");
+  const char *root = std::getenv("CROSSINK_SIM_HTTP_MOCK_ROOT");
   if (!root || root[0] == '\0')
     return false;
 
   std::string name = basenameFromUrl(url);
   if (name.empty() || name == "." || name == ".." ||
-      name.find('/') != std::string::npos || name.find('\\') != std::string::npos) {
+      name.find('/') != std::string::npos ||
+      name.find('\\') != std::string::npos) {
     return false;
   }
 
@@ -170,7 +172,8 @@ inline bool fetchFromMockRoot(const std::string &url, Response &out) {
 
   if (!readFile(path, out.body)) {
     std::string nestedPath;
-    if (!findFileByBasename(root, name, nestedPath) || !readFile(nestedPath, out.body))
+    if (!findFileByBasename(root, name, nestedPath) ||
+        !readFile(nestedPath, out.body))
       return false;
   }
 
@@ -213,7 +216,8 @@ inline bool fetchWithCurl(const std::string &url, const char *method,
 
   std::string statusText;
   std::array<char, 64> statusBuffer{};
-  while (fgets(statusBuffer.data(), static_cast<int>(statusBuffer.size()), pipe)) {
+  while (
+      fgets(statusBuffer.data(), static_cast<int>(statusBuffer.size()), pipe)) {
     statusText += statusBuffer.data();
   }
   const int rc = pclose(pipe);
@@ -231,7 +235,8 @@ inline bool fetchWithCurl(const std::string &url, const char *method,
 
 inline bool fetch(const std::string &url, const char *method,
                   const std::map<std::string, std::string> &headers,
-                  const std::string &basicAuth, const char *body, Response &out) {
+                  const std::string &basicAuth, const char *body,
+                  Response &out) {
   out = Response{};
   if (fetchFromMockRoot(url, out))
     return true;
