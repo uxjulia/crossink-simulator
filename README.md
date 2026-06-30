@@ -1,6 +1,6 @@
 # CrossPoint Simulator
 
-A desktop simulator for [CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader)-based firmware. Compiles the firmware natively and renders the e-ink display in an SDL2 window. No device required. Can be used with forks of Crosspoint but any new methods added to the firmware will need to be stubbed.
+A desktop simulator for [CrossInk](https://github.com/uxjulia/CrossInk). Compiles the firmware natively and renders the e-ink display in an SDL2 window. No device required.
 
 > [!NOTE]
 > **Platform support:** macOS and Linux/WSL use different native compiler and library flags. Start from `sample-platformio-macos.ini` on macOS, or `sample-platformio-linux-wsl.ini` on Linux/WSL. Native Windows is not supported; use WSL and follow the Linux instructions.
@@ -75,13 +75,13 @@ extra_scripts =
   pre:scripts/gen_i18n.py
   pre:scripts/git_branch.py
   pre:scripts/build_html.py
-  post:../crosspoint-simulator/run_simulator_project.py
+  post:../crossink-simulator/run_simulator_project.py
 ```
 
-Use the symlink form only when the `Crosspoint` repo and this `crosspoint-simulator` repo are checked out side by side and your `lib_deps` entry is:
+Use the symlink form only when the `CrossInk` repo and this `crossink-simulator` repo are checked out side by side and your `lib_deps` entry is:
 
 ```ini
-simulator=symlink://../crosspoint-simulator
+simulator=symlink://../crossink-simulator
 ```
 
 The `custom_run_simulator_target_owner = project` line tells the library-side hook not to register the same launcher a second time. Without that, closing one simulator window can immediately relaunch another because both the library hook and the project hook try to own `run_simulator`.
@@ -93,11 +93,11 @@ The `post:` line above only exposes the task in the consuming project UI. The ac
 
 ## Setup
 
-Place EPUB books at `./fs_/books/` in the Crosspoint repo's root. This maps to the `/books/` path on the physical SD card.
+Place EPUB books at `./fs_/books/` in the repo's root. This maps to the `/books/` path on the physical SD card.
 
 ## Build and run
 
-Run this command from the Crosspoint project after you have added the `[env:simulator]` config to Crosspoint's `platformio.ini` file. Alternatively, if you added the project hook above, you can click "Build" from PlatformIO's IDE task list and then "Run Simulator" (nested under the "Custom" folder).
+Run this command from the project after you have added the `[env:simulator]` config to `platformio.ini`. Alternatively, if you added the project hook above, you can click "Build" from PlatformIO's IDE task list and then "Run Simulator" (nested under the "Custom" folder).
 
 ```bash
 pio run -e simulator -t run_simulator
@@ -123,7 +123,7 @@ host's `curl` binary through simulator implementations of `HTTPClient` and
 `esp_http_client`. This keeps the firmware code path intact while allowing the
 desktop build to reach real HTTP/HTTPS services.
 
-**Mocked downloads**: Set `CROSSPOINT_SIM_HTTP_MOCK_ROOT` to a folder of local
+**Mocked downloads**: Set `CROSSINK_SIM_HTTP_MOCK_ROOT` to a folder of local
 fixtures to make host-backed HTTP requests return local files by basename before
 falling back to the real network. This is useful for SD-font testing because the
 firmware can request its normal release URLs while the simulator serves a local
@@ -136,7 +136,7 @@ python3 lib/EpdFont/scripts/build-sd-fonts.py \
   --only NotoSansExtended \
   --manifest \
   --base-url "https://github.com/crosspoint-reader/crosspoint-fonts/releases/download/local/"
-CROSSPOINT_SIM_HTTP_MOCK_ROOT="$PWD/lib/EpdFont/scripts/output" \
+CROSSINK_SIM_HTTP_MOCK_ROOT="$PWD/lib/EpdFont/scripts/output" \
   pio run -e simulator -t run
 ```
 
