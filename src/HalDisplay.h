@@ -67,9 +67,12 @@ public:
                          const unsigned char *lut = nullptr,
                          bool factoryMode = false);
 
-  // Tiled grayscale strip — no-op in simulator; supportsStripGrayscale()
-  // returns false so callers fall back to the framebuffer path.
-  void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows);
+  // The simulator intentionally advertises strip grayscale support so host
+  // builds exercise the same low-memory path as the device firmware, and so
+  // streamed plane data can feed the same grayscale preview compositor as the
+  // legacy full-frame API.
+  void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows,
+                                uint16_t yStart, uint16_t numRows);
   bool supportsStripGrayscale() const;
 
   // Simulator only: call from main thread to push rendered pixels to SDL.

@@ -3,6 +3,7 @@
 #include <GfxRenderer.h>
 #include <SDL.h>
 
+#include <array>
 #include <atomic>
 #include <cstring>
 #include <iostream>
@@ -26,6 +27,100 @@ std::atomic<bool> quitRequested{false};
 
 static int currentWindowWidth = 0;
 static int currentWindowHeight = 0;
+
+namespace {
+
+struct GrayscalePreviewState {
+  std::array<uint8_t, HalDisplay::BUFFER_SIZE> bwBase{};
+  std::array<uint8_t, HalDisplay::BUFFER_SIZE> lsbPlane{};
+  std::array<uint8_t, HalDisplay::BUFFER_SIZE> msbPlane{};
+  bool bwBaseValid = false;
+  bool lsbValid = false;
+  bool msbValid = false;
+};
+
+constexpr uint8_t kGrayWhite = 255;
+constexpr uint8_t kGrayLight = 200;
+constexpr uint8_t kGrayDark = 96;
+constexpr uint8_t kGrayBlack = 0;
+
+GrayscalePreviewState grayscalePreviewState;
+
+uint32_t argbGray(uint8_t level) {
+  return 0xFF000000u | (static_cast<uint32_t>(level) << 16) |
+         (static_cast<uint32_t>(level) << 8) | level;
+}
+
+bool getBit(const uint8_t *buffer, int x, int y) {
+  const int byteIdx = (y * HalDisplay::DISPLAY_WIDTH + x) / 8;
+  const int bitIdx = 7 - (x % 8);
+  return (buffer[byteIdx] & (1 << bitIdx)) != 0;
+}
+
+void renderBwPixels(const uint8_t *fb) {
+  for (int y = 0; y < HalDisplay::DISPLAY_HEIGHT; y++) {
+    for (int x = 0; x < HalDisplay::DISPLAY_WIDTH; x++) {
+      pixelBuf[y * HalDisplay::DISPLAY_WIDTH + x] =
+          getBit(fb, x, y) ? 0xFFFFFFFFu : 0xFF000000u;
+    }
+  }
+  pendingPresent.store(true);
+}
+
+void clearGrayscalePlanes() {
+  grayscalePreviewState.lsbPlane.fill(0);
+  grayscalePreviewState.msbPlane.fill(0);
+  grayscalePreviewState.lsbValid = false;
+  grayscalePreviewState.msbValid = false;
+}
+
+void snapshotBwBase(const uint8_t *fb) {
+  memcpy(grayscalePreviewState.bwBase.data(), fb, HalDisplay::BUFFER_SIZE);
+  grayscalePreviewState.bwBaseValid = true;
+  clearGrayscalePlanes();
+}
+
+void copyPlane(std::array<uint8_t, HalDisplay::BUFFER_SIZE> &dst,
+               const uint8_t *src, bool &valid) {
+  if (!src) {
+    valid = false;
+    dst.fill(0);
+    return;
+  }
+  memcpy(dst.data(), src, HalDisplay::BUFFER_SIZE);
+  valid = true;
+}
+
+void composeGrayscalePreview() {
+  const uint8_t *bwBase = grayscalePreviewState.bwBaseValid
+                              ? grayscalePreviewState.bwBase.data()
+                              : display.getFrameBuffer();
+  for (int y = 0; y < HalDisplay::DISPLAY_HEIGHT; y++) {
+    for (int x = 0; x < HalDisplay::DISPLAY_WIDTH; x++) {
+      const bool baseWhite = getBit(bwBase, x, y);
+      const bool lsbActive = grayscalePreviewState.lsbValid &&
+                             getBit(grayscalePreviewState.lsbPlane.data(), x, y);
+      const bool msbActive = grayscalePreviewState.msbValid &&
+                             getBit(grayscalePreviewState.msbPlane.data(), x, y);
+
+      uint8_t level = kGrayWhite;
+      if (!baseWhite) {
+        if (msbActive) {
+          level = lsbActive ? kGrayDark : kGrayLight;
+        } else if (lsbActive) {
+          level = kGrayDark;
+        } else {
+          level = kGrayBlack;
+        }
+      }
+
+      pixelBuf[y * HalDisplay::DISPLAY_WIDTH + x] = argbGray(level);
+    }
+  }
+  pendingPresent.store(true);
+}
+
+} // namespace
 
 static bool isPortraitOrientation(GfxRenderer::Orientation orientation) {
   return orientation == GfxRenderer::Portrait ||
@@ -154,15 +249,8 @@ void HalDisplay::displayWindow(int, int, int, int) {
 // pixels and flag for present.
 void HalDisplay::refreshDisplay(RefreshMode /*mode*/, bool /*turnOffScreen*/) {
   const uint8_t *fb = getFrameBuffer();
-  for (int y = 0; y < DISPLAY_HEIGHT; y++) {
-    for (int x = 0; x < DISPLAY_WIDTH; x++) {
-      int byteIdx = (y * DISPLAY_WIDTH + x) / 8;
-      int bitIdx = 7 - (x % 8);
-      bool isWhite = (fb[byteIdx] & (1 << bitIdx)) != 0;
-      pixelBuf[y * DISPLAY_WIDTH + x] = isWhite ? 0xFFFFFFFF : 0xFF000000;
-    }
-  }
-  pendingPresent.store(true);
+  snapshotBwBase(fb);
+  renderBwPixels(fb);
 }
 
 // Called from the main thread (simulator_main.cpp) to push pixels to SDL.
@@ -233,19 +321,58 @@ uint8_t *HalDisplay::getFrameBuffer() const {
   return buffer;
 }
 
-void HalDisplay::copyGrayscaleBuffers(const uint8_t *, const uint8_t *) {}
+void HalDisplay::copyGrayscaleBuffers(const uint8_t *lsbBuffer,
+                                      const uint8_t *msbBuffer) {
+  copyGrayscaleLsbBuffers(lsbBuffer);
+  copyGrayscaleMsbBuffers(msbBuffer);
+}
 void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) {
   displayBuffer(fallback, turnOffScreen);
 }
 void HalDisplay::preconditionGrayscale() {}
 void HalDisplay::preconditionGrayscale(uint16_t, uint16_t, uint16_t, uint16_t) {}
-void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t *) {}
-void HalDisplay::copyGrayscaleMsbBuffers(const uint8_t *) {}
-void HalDisplay::cleanupGrayscaleBuffers(const uint8_t *) {}
-void HalDisplay::displayGrayBuffer(bool, const unsigned char *, bool) {}
+void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t *lsbBuffer) {
+  copyPlane(grayscalePreviewState.lsbPlane, lsbBuffer,
+            grayscalePreviewState.lsbValid);
+}
+void HalDisplay::copyGrayscaleMsbBuffers(const uint8_t *msbBuffer) {
+  copyPlane(grayscalePreviewState.msbPlane, msbBuffer,
+            grayscalePreviewState.msbValid);
+}
+void HalDisplay::cleanupGrayscaleBuffers(const uint8_t *bwBuffer) {
+  if (bwBuffer) {
+    snapshotBwBase(bwBuffer);
+  } else {
+    grayscalePreviewState.bwBaseValid = false;
+    grayscalePreviewState.bwBase.fill(0);
+    clearGrayscalePlanes();
+  }
+}
+void HalDisplay::displayGrayBuffer(bool, const unsigned char *, bool) {
+  composeGrayscalePreview();
+}
 
-void HalDisplay::writeGrayscalePlaneStrip(bool, const uint8_t*, uint16_t, uint16_t) {}
-bool HalDisplay::supportsStripGrayscale() const { return false; }
+void HalDisplay::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t *rows,
+                                          uint16_t yStart, uint16_t numRows) {
+  if (!rows || numRows == 0 || yStart >= DISPLAY_HEIGHT) {
+    return;
+  }
+
+  const uint16_t rowsToCopy =
+      (yStart + numRows > DISPLAY_HEIGHT) ? (DISPLAY_HEIGHT - yStart) : numRows;
+  const size_t offset = static_cast<size_t>(yStart) * DISPLAY_WIDTH_BYTES;
+  const size_t byteCount =
+      static_cast<size_t>(rowsToCopy) * DISPLAY_WIDTH_BYTES;
+  auto &plane = lsbPlane ? grayscalePreviewState.lsbPlane
+                         : grayscalePreviewState.msbPlane;
+  memcpy(plane.data() + offset, rows, byteCount);
+  if (lsbPlane) {
+    grayscalePreviewState.lsbValid = true;
+  } else {
+    grayscalePreviewState.msbValid = true;
+  }
+}
+bool HalDisplay::supportsStripGrayscale() const { return true; }
 
 uint16_t HalDisplay::getDisplayWidth() const { return DISPLAY_WIDTH; }
 uint16_t HalDisplay::getDisplayHeight() const { return DISPLAY_HEIGHT; }
