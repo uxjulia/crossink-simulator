@@ -351,6 +351,7 @@ void HalDisplay::cleanupGrayscaleBuffers(const uint8_t *bwBuffer) {
 void HalDisplay::displayGrayBuffer(bool, const unsigned char *, bool) {
   composeGrayscalePreview();
 }
+void HalDisplay::displayFactoryGrayBuffer(bool) { composeGrayscalePreview(); }
 
 void HalDisplay::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t *rows,
                                           uint16_t yStart, uint16_t numRows) {

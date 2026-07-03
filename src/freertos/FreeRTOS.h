@@ -5,6 +5,7 @@
 
 #define pdTRUE 1
 #define pdFALSE 0
+#define pdPASS 1
 #define portMAX_DELAY 0xFFFFFFFF
 #define taskENTER_CRITICAL(x)                                                  \
   do {                                                                         \
