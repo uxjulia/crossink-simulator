@@ -16,6 +16,8 @@ typedef SimMutex *SemaphoreHandle_t;
 
 inline SemaphoreHandle_t xSemaphoreCreateMutex() { return new SimMutex(); }
 
+inline void vSemaphoreDelete(SemaphoreHandle_t sem) { delete sem; }
+
 inline bool xSemaphoreTake(SemaphoreHandle_t sem, uint32_t /*ticksToWait*/) {
   if (!sem)
     return true;

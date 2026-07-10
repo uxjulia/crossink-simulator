@@ -9,6 +9,8 @@
 class HWCDC : public Stream {
 public:
   void begin(unsigned long baud) {}
+  void setRxBufferSize(size_t size) {}
+  void setTxBufferSize(size_t size) {}
   void setTxTimeoutMs(uint32_t timeoutMs) {}
   size_t write(uint8_t c) override {
     std::cerr << (char)c;
@@ -20,6 +22,7 @@ public:
   }
   int available() override { return 0; }
   int read() override { return -1; }
+  size_t read(uint8_t *buffer, size_t size) { return 0; }
   int peek() override { return -1; }
   template <typename... Args> void printf(const char *format, Args... args) {
     if constexpr (sizeof...(Args) == 0) {
