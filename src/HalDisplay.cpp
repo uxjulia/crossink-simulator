@@ -20,6 +20,8 @@ static constexpr int SIMULATOR_WINDOW_SCALE = 1;
 // SDL_RenderPresent. On macOS, SDL calls must happen on the main thread.
 static uint32_t
     pixelBuf[HalDisplay::DISPLAY_WIDTH * HalDisplay::DISPLAY_HEIGHT];
+static uint8_t frameBufferStorage[HalDisplay::BUFFER_SIZE];
+static bool frameBufferLent = false;
 static std::atomic<bool> pendingPresent{false};
 // Written by HalGPIO::update() (which owns SDL event polling); read by
 // shouldQuit().
@@ -317,8 +319,29 @@ bool HalDisplay::shouldQuit() const { return quitRequested.load(); }
 void HalDisplay::deepSleep() { presentIfNeeded(); }
 
 uint8_t *HalDisplay::getFrameBuffer() const {
-  static uint8_t buffer[HalDisplay::BUFFER_SIZE];
-  return buffer;
+  return frameBufferLent ? nullptr : frameBufferStorage;
+}
+
+uint8_t *HalDisplay::lendFrameBufferStorage(uint32_t *sizeOut) {
+  if (frameBufferLent) {
+    if (sizeOut) {
+      *sizeOut = 0;
+    }
+    return nullptr;
+  }
+  frameBufferLent = true;
+  if (sizeOut) {
+    *sizeOut = BUFFER_SIZE;
+  }
+  return frameBufferStorage;
+}
+
+void HalDisplay::returnFrameBufferStorage() {
+  if (!frameBufferLent) {
+    return;
+  }
+  memset(frameBufferStorage, 0xFF, BUFFER_SIZE);
+  frameBufferLent = false;
 }
 
 void HalDisplay::copyGrayscaleBuffers(const uint8_t *lsbBuffer,

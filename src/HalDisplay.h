@@ -46,6 +46,8 @@ public:
 
   // Access to frame buffer
   uint8_t *getFrameBuffer() const;
+  uint8_t *lendFrameBufferStorage(uint32_t *sizeOut);
+  void returnFrameBufferStorage();
 
   // Runtime geometry passthrough
   uint16_t getDisplayWidth() const;
