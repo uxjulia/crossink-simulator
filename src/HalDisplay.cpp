@@ -15,6 +15,21 @@ static SDL_Texture *texture = nullptr;
 // small. With 1:1 pixel mapping, the simulator can be used for testing fine
 // details.
 static constexpr int SIMULATOR_WINDOW_SCALE = 1;
+// Physical bezels can cover the outermost panel pixels. Keep the framebuffer at
+// the real panel size, but crop the visible SDL viewport to mimic that.
+static constexpr int SIMULATOR_BEZEL_INSET = 5;
+static constexpr int SIMULATOR_VISIBLE_PANEL_WIDTH =
+    HalDisplay::DISPLAY_WIDTH - (SIMULATOR_BEZEL_INSET * 2);
+static constexpr int SIMULATOR_VISIBLE_PANEL_HEIGHT =
+    HalDisplay::DISPLAY_HEIGHT - (SIMULATOR_BEZEL_INSET * 2);
+static constexpr int SIMULATOR_VISIBLE_WINDOW_WIDTH =
+    SIMULATOR_VISIBLE_PANEL_WIDTH * SIMULATOR_WINDOW_SCALE;
+static constexpr int SIMULATOR_VISIBLE_WINDOW_HEIGHT =
+    SIMULATOR_VISIBLE_PANEL_HEIGHT * SIMULATOR_WINDOW_SCALE;
+static_assert(SIMULATOR_VISIBLE_PANEL_WIDTH > 0,
+              "Simulator bezel inset is too large for display width");
+static_assert(SIMULATOR_VISIBLE_PANEL_HEIGHT > 0,
+              "Simulator bezel inset is too large for display height");
 
 // Pixel buffer written by the render task, read by the main thread for
 // SDL_RenderPresent. On macOS, SDL calls must happen on the main thread.
@@ -100,10 +115,12 @@ void composeGrayscalePreview() {
   for (int y = 0; y < HalDisplay::DISPLAY_HEIGHT; y++) {
     for (int x = 0; x < HalDisplay::DISPLAY_WIDTH; x++) {
       const bool baseWhite = getBit(bwBase, x, y);
-      const bool lsbActive = grayscalePreviewState.lsbValid &&
-                             getBit(grayscalePreviewState.lsbPlane.data(), x, y);
-      const bool msbActive = grayscalePreviewState.msbValid &&
-                             getBit(grayscalePreviewState.msbPlane.data(), x, y);
+      const bool lsbActive =
+          grayscalePreviewState.lsbValid &&
+          getBit(grayscalePreviewState.lsbPlane.data(), x, y);
+      const bool msbActive =
+          grayscalePreviewState.msbValid &&
+          getBit(grayscalePreviewState.msbPlane.data(), x, y);
 
       uint8_t level = kGrayWhite;
       if (!baseWhite) {
@@ -132,10 +149,10 @@ static bool isPortraitOrientation(GfxRenderer::Orientation orientation) {
 static void getLogicalWindowSize(GfxRenderer::Orientation orientation,
                                  int *width, int *height) {
   const bool isPortrait = isPortraitOrientation(orientation);
-  *width = (isPortrait ? HalDisplay::DISPLAY_HEIGHT : HalDisplay::DISPLAY_WIDTH) *
-           SIMULATOR_WINDOW_SCALE;
-  *height = (isPortrait ? HalDisplay::DISPLAY_WIDTH : HalDisplay::DISPLAY_HEIGHT) *
-            SIMULATOR_WINDOW_SCALE;
+  *width = isPortrait ? SIMULATOR_VISIBLE_WINDOW_HEIGHT
+                      : SIMULATOR_VISIBLE_WINDOW_WIDTH;
+  *height = isPortrait ? SIMULATOR_VISIBLE_WINDOW_WIDTH
+                       : SIMULATOR_VISIBLE_WINDOW_HEIGHT;
 }
 
 static void applyWindowGeometryIfNeeded(GfxRenderer::Orientation orientation) {
@@ -272,6 +289,12 @@ void HalDisplay::presentIfNeeded() {
                     DISPLAY_WIDTH * sizeof(uint32_t));
   SDL_RenderClear(sdl_renderer);
 
+  const SDL_Rect src = {SIMULATOR_BEZEL_INSET, SIMULATOR_BEZEL_INSET,
+                        SIMULATOR_VISIBLE_PANEL_WIDTH,
+                        SIMULATOR_VISIBLE_PANEL_HEIGHT};
+  const SDL_Rect landscapeDst = {0, 0, SIMULATOR_VISIBLE_WINDOW_WIDTH,
+                                 SIMULATOR_VISIBLE_WINDOW_HEIGHT};
+
   // For portrait modes the landscape panel texture must be rotated to fill the
   // portrait window. SDL_RenderCopyEx rotates around the centre of dst, so dst
   // must stay landscape-oriented and be offset so its centre coincides with the
@@ -283,30 +306,30 @@ void HalDisplay::presentIfNeeded() {
   switch (orientation) {
   case GfxRenderer::Portrait: {
     // dst centre = window centre, landscape-sized panel texture.
-    SDL_Rect dst = {(DISPLAY_HEIGHT - DISPLAY_WIDTH) / 2,
-                    DISPLAY_WIDTH / 2 - DISPLAY_HEIGHT / 2, DISPLAY_WIDTH,
-                    DISPLAY_HEIGHT};
-    SDL_RenderCopyEx(sdl_renderer, texture, nullptr, &dst, 90.0, nullptr,
+    SDL_Rect dst = {
+        (SIMULATOR_VISIBLE_WINDOW_HEIGHT - SIMULATOR_VISIBLE_WINDOW_WIDTH) / 2,
+        (SIMULATOR_VISIBLE_WINDOW_WIDTH - SIMULATOR_VISIBLE_WINDOW_HEIGHT) / 2,
+        SIMULATOR_VISIBLE_WINDOW_WIDTH, SIMULATOR_VISIBLE_WINDOW_HEIGHT};
+    SDL_RenderCopyEx(sdl_renderer, texture, &src, &dst, 90.0, nullptr,
                      SDL_FLIP_NONE);
     break;
   }
   case GfxRenderer::PortraitInverted: {
-    SDL_Rect dst = {(DISPLAY_HEIGHT - DISPLAY_WIDTH) / 2,
-                    DISPLAY_WIDTH / 2 - DISPLAY_HEIGHT / 2, DISPLAY_WIDTH,
-                    DISPLAY_HEIGHT};
-    SDL_RenderCopyEx(sdl_renderer, texture, nullptr, &dst, -90.0, nullptr,
+    SDL_Rect dst = {
+        (SIMULATOR_VISIBLE_WINDOW_HEIGHT - SIMULATOR_VISIBLE_WINDOW_WIDTH) / 2,
+        (SIMULATOR_VISIBLE_WINDOW_WIDTH - SIMULATOR_VISIBLE_WINDOW_HEIGHT) / 2,
+        SIMULATOR_VISIBLE_WINDOW_WIDTH, SIMULATOR_VISIBLE_WINDOW_HEIGHT};
+    SDL_RenderCopyEx(sdl_renderer, texture, &src, &dst, -90.0, nullptr,
                      SDL_FLIP_NONE);
     break;
   }
   case GfxRenderer::LandscapeClockwise: {
-    SDL_Rect dst = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
-    SDL_RenderCopyEx(sdl_renderer, texture, nullptr, &dst, 180.0, nullptr,
+    SDL_RenderCopyEx(sdl_renderer, texture, &src, &landscapeDst, 180.0, nullptr,
                      SDL_FLIP_NONE);
     break;
   }
   default: {
-    SDL_Rect dst = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
-    SDL_RenderCopy(sdl_renderer, texture, nullptr, &dst);
+    SDL_RenderCopy(sdl_renderer, texture, &src, &landscapeDst);
     break;
   }
   }
@@ -349,11 +372,13 @@ void HalDisplay::copyGrayscaleBuffers(const uint8_t *lsbBuffer,
   copyGrayscaleLsbBuffers(lsbBuffer);
   copyGrayscaleMsbBuffers(msbBuffer);
 }
-void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) {
+void HalDisplay::displayGrayscaleBase(RefreshMode fallback,
+                                      bool turnOffScreen) {
   displayBuffer(fallback, turnOffScreen);
 }
 void HalDisplay::preconditionGrayscale() {}
-void HalDisplay::preconditionGrayscale(uint16_t, uint16_t, uint16_t, uint16_t) {}
+void HalDisplay::preconditionGrayscale(uint16_t, uint16_t, uint16_t, uint16_t) {
+}
 void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t *lsbBuffer) {
   copyPlane(grayscalePreviewState.lsbPlane, lsbBuffer,
             grayscalePreviewState.lsbValid);
