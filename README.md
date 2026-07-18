@@ -1,4 +1,4 @@
-# CrossPoint Simulator
+# CrossInk Simulator
 
 A desktop simulator for [CrossInk](https://github.com/uxjulia/CrossInk). Compiles the firmware natively and renders the e-ink display in an SDL2 window. No device required.
 
