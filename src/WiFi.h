@@ -29,6 +29,11 @@ enum wifi_mode_t {
   WIFI_MODE_NULL = 0
 };
 enum wifi_auth_mode_t { WIFI_AUTH_OPEN = 0, WIFI_AUTH_WPA2_PSK = 3 };
+enum wifi_scan_method_t { WIFI_FAST_SCAN = 0, WIFI_ALL_CHANNEL_SCAN = 1 };
+enum wifi_sort_method_t {
+  WIFI_CONNECT_AP_BY_SIGNAL = 0,
+  WIFI_CONNECT_AP_BY_SECURITY = 1
+};
 
 #define WIFI_MODE_STA WIFI_STA
 #define WIFI_MODE_AP WIFI_AP
@@ -190,7 +195,8 @@ public:
                                          : IPAddress();
   }
   void persistent(bool) {}
-  bool disconnect(bool wifioff = false, bool eraseap = false, unsigned long timeout = 0) {
+  bool disconnect(bool wifioff = false, bool eraseap = false,
+                  unsigned long timeout = 0) {
     (void)wifioff;
     (void)eraseap;
     (void)timeout;
@@ -256,6 +262,14 @@ public:
                                                            : String();
   }
   int RSSI() { return -45; }
+  uint8_t *BSSID(uint8_t *bssid = nullptr) {
+    if (bssid) {
+      const std::array<uint8_t, 6> value{0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
+      memcpy(bssid, value.data(), value.size());
+    }
+    return bssid;
+  }
+  int32_t channel() { return 1; }
   int RSSI(int i) {
     const auto &networks = configuredNetworks();
     return i >= 0 && i < static_cast<int>(networks.size()) ? networks[i].rssi
@@ -270,6 +284,8 @@ public:
   wifi_mode_t getMode() { return currentMode; }
   void setSleep(bool) {}
   void setAutoReconnect(bool) {}
+  void setScanMethod(wifi_scan_method_t) {}
+  void setSortMethod(wifi_sort_method_t) {}
   String getHostname() { return String("crosspoint-simulator"); }
   int softAPgetStationNum() { return 0; }
 };
