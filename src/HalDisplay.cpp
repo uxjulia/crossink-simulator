@@ -3,10 +3,13 @@
 #include <GfxRenderer.h>
 #include <SDL.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstring>
 #include <iostream>
+
+#include "SimulatorInput.h"
 
 static SDL_Window *window = nullptr;
 static SDL_Renderer *sdl_renderer = nullptr;
@@ -44,6 +47,42 @@ std::atomic<bool> quitRequested{false};
 
 static int currentWindowWidth = 0;
 static int currentWindowHeight = 0;
+
+void simulatorWindowPointToPanelNormalized(const int windowX, const int windowY,
+                                           float &nx, float &ny) {
+  extern GfxRenderer renderer;
+  const int logicalX = windowX + SIMULATOR_BEZEL_INSET;
+  const int logicalY = windowY + SIMULATOR_BEZEL_INSET;
+  int panelX = 0;
+  int panelY = 0;
+
+  switch (renderer.getOrientation()) {
+  case GfxRenderer::Portrait:
+    panelX = logicalY;
+    panelY = HalDisplay::DISPLAY_HEIGHT - 1 - logicalX;
+    break;
+  case GfxRenderer::PortraitInverted:
+    panelX = HalDisplay::DISPLAY_WIDTH - 1 - logicalY;
+    panelY = logicalX;
+    break;
+  case GfxRenderer::LandscapeClockwise:
+    panelX = HalDisplay::DISPLAY_WIDTH - 1 - logicalX;
+    panelY = HalDisplay::DISPLAY_HEIGHT - 1 - logicalY;
+    break;
+  case GfxRenderer::LandscapeCounterClockwise:
+  default:
+    panelX = logicalX;
+    panelY = logicalY;
+    break;
+  }
+
+  panelX =
+      std::clamp(panelX, 0, static_cast<int>(HalDisplay::DISPLAY_WIDTH) - 1);
+  panelY =
+      std::clamp(panelY, 0, static_cast<int>(HalDisplay::DISPLAY_HEIGHT) - 1);
+  nx = static_cast<float>(panelX) / (HalDisplay::DISPLAY_WIDTH - 1);
+  ny = static_cast<float>(panelY) / (HalDisplay::DISPLAY_HEIGHT - 1);
+}
 
 namespace {
 
@@ -174,7 +213,10 @@ static void applyWindowGeometryIfNeeded(GfxRenderer::Orientation orientation) {
 HalDisplay::HalDisplay() {}
 HalDisplay::~HalDisplay() {}
 
-#if defined(SIMULATOR_DEVICE_X3)
+#if defined(SIMULATOR_DEVICE_STICKY)
+static constexpr const char *WINDOW_TITLE =
+    "Simulator - Seeed Studio XIAO ePaper Display Board (3.97\")";
+#elif defined(SIMULATOR_DEVICE_X3)
 static constexpr const char *WINDOW_TITLE = "Simulator - XTEINK X3";
 #else
 static constexpr const char *WINDOW_TITLE = "Simulator - XTEINK X4";
@@ -214,6 +256,16 @@ void HalDisplay::begin() {
 }
 
 void HalDisplay::begin(bool /*seamless*/) { begin(); }
+
+void HalDisplay::displayBufferAsync(const RefreshMode mode) {
+  displayBuffer(mode);
+}
+
+void HalDisplay::waitRefreshComplete() {}
+
+bool HalDisplay::supportsAsyncRefresh() const { return false; }
+
+bool HalDisplay::supportsAsyncGrayscaleBase() const { return false; }
 
 void HalDisplay::clearScreen(uint8_t color) const {
   memset(getFrameBuffer(), color, BUFFER_SIZE);

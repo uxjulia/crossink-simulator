@@ -65,6 +65,16 @@ public:
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
+  bool hasTouch() const;
+  bool wasTouchTap(float &nx, float &ny) const;
+  bool wasTouchDown(float &nx, float &ny) const;
+  bool isTouchTapCandidate(float &nx, float &ny, unsigned long &heldMs) const;
+  bool isTouchHeldAt(float &nx, float &ny) const;
+  unsigned long lastTouchHeldMs() const;
+  bool wasSwipe(float &nxStart, float &nyStart, float &nxEnd,
+                float &nyEnd) const;
+  bool wasTouchActivity() const;
+  void setSharedConfirmPowerShortPressEmitsPower(bool enabled);
   bool consumeSimulatorSleepRequest();
 
   // Setup wake up GPIO and enter deep sleep

@@ -26,4 +26,5 @@ struct SimTaskHandle {
   std::thread::id id;
   const char *name = "sim-task";
 };
+typedef int BaseType_t;
 typedef SimTaskHandle *TaskHandle_t;

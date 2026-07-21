@@ -26,6 +26,10 @@ The simulator is a collection of host-side reimplementations of the firmware's h
 
 **The HAL stub rule.** When the firmware adds a new method to a HAL class and calls it, the simulator fails to link until a matching stub is added to the corresponding `Hal*.cpp` here. Most additions are one-line no-ops. This is the single most common reason a simulator build breaks after pulling firmware updates.
 
+**Simulator ownership.** Device-specific native behavior belongs in this repository, including Sticky touch input, device-selection flags, `BoardConfig` compatibility, and new HAL/Arduino/ESP-IDF shims required by a simulator build. Do not place those shims in the consuming CrossInk firmware just to make a native environment compile. The firmware repo should only define an environment such as `sticky-simulator`, select it with a flag such as `SIMULATOR_DEVICE_STICKY`, and consume a published revision of this library.
+
+A successful build against `simulator=symlink://../crossink-simulator` validates the two local checkouts together; it does not prove that the firmware's Git dependency works for anyone else. Before reporting a new simulator environment complete, publish these simulator changes, update or pin the firmware dependency to that revision, remove the existing `.pio/libdeps/<environment>/simulator` checkout if needed, and rebuild using the Git dependency.
+
 **Why the simulator's design has the shape it does** (the non-obvious parts):
 
 - **SDL on main thread.** macOS requires all SDL calls to come from the main thread, but firmware drives rendering from a FreeRTOS render task. The split lives in [src/HalDisplay.cpp](src/HalDisplay.cpp): `refreshDisplay` (background thread) converts the 1bpp framebuffer to ARGB and sets an atomic `pendingPresent` flag. `presentIfNeeded` (called from `simulator_main` on the main thread) does the actual SDL upload and present. Do not call SDL render functions from anywhere else.
@@ -50,6 +54,7 @@ The simulator is a collection of host-side reimplementations of the firmware's h
 ## When making changes
 
 - Adding a new HAL method? Mirror the firmware signature exactly and stub it (usually no-op) in the matching `Hal*.cpp/.h`. Do not invent new public methods that don't exist in the firmware HAL.
+- Adding support for another device or firmware simulator environment? Implement its host-side input, display, board configuration, and compatibility shims in this repo first. Publish the simulator revision before treating the consuming firmware environment as complete.
 - Adding a new Arduino/ESP-IDF symbol? Add the minimum stub to the corresponding header in [src/](src/) (e.g. [src/WiFi.h](src/WiFi.h), [src/Arduino.h](src/Arduino.h)). Match the upstream signature, return a sensible default.
 - Touching storage or caching code? After the change, `rm -rf ./fs_/.crosspoint/` in the firmware project before re-running, otherwise stale caches built by the old code will mask the fix.
 - Touching display, threading, or shutdown? Re-read the "Why the simulator's design has the shape it does" section above first. Several of those decisions undo subtle bugs that will resurface if reverted.
