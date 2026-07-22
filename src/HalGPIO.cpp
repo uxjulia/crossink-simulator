@@ -253,6 +253,10 @@ bool HalGPIO::wasTouchDown(float &nx, float &ny) const {
   return true;
 }
 
+bool HalGPIO::wasTouchReleased() const {
+  return hasTouch() && touch.releasedThisFrame;
+}
+
 bool HalGPIO::isTouchTapCandidate(float &nx, float &ny,
                                   unsigned long &heldMs) const {
   if (!hasTouch() || !touch.pressed || touch.movedBeyondTapSlop)
