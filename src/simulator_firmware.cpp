@@ -4,7 +4,7 @@
 #include "network/OtaBootSwitch.h"
 
 namespace firmware_flash {
-Result flashFromSdPath(const char *, ProgressCb onProgress, void *ctx, bool) {
+Result flashFromSdPath(const char *, ProgressCb onProgress, void *ctx) {
   LOG_DBG("FLASH",
           "[SIM] Firmware flashing is not supported in the native simulator");
   if (onProgress)
@@ -37,6 +37,10 @@ const char *resultName(Result r) {
     return "BAD_CHECKSUM";
   case Result::BAD_SHA:
     return "BAD_SHA";
+  case Result::BAD_CHIP:
+    return "BAD_CHIP";
+  case Result::WRONG_BOARD:
+    return "WRONG_BOARD";
   case Result::BAD_SIZE:
     return "BAD_SIZE";
   case Result::NO_PARTITION:
