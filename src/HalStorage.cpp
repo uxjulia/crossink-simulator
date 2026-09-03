@@ -88,6 +88,7 @@ bool HalStorage::begin() {
   return ::mkdir(root.c_str(), 0777) == 0 || errno == EEXIST;
 }
 bool HalStorage::ready() const { return true; }
+void HalStorage::shutdown() {}
 
 class HalFile::Impl {
 public:
