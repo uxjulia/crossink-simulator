@@ -6,6 +6,7 @@
 #include "HalDisplay.h"
 #include "HalGPIO.h"
 #include "SimulatorLifecycle.h"
+#include "SimulatorStackCheck.h"
 
 extern void setup();
 extern void loop();
@@ -13,6 +14,7 @@ extern HalDisplay display; // defined in main.cpp
 
 int main(int argc, char **argv) {
   SimulatorLifecycle::initProcessArgs(argv);
+  simStackCheckStartup();
   setup();
   while (!display.shouldQuit()) {
     // Clear input edge latches once per frame. update() may be called many

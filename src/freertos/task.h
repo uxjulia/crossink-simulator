@@ -23,14 +23,19 @@ inline TaskHandle_t xTaskGetCurrentTaskHandle() {
 // Create a real OS thread. The FreeRTOS task function signature is
 // void(*)(void*).
 inline BaseType_t xTaskCreate(void (*fn)(void *), const char *name,
-                              uint32_t /*stackDepth*/, void *param,
+                              uint32_t stackDepth, void *param,
                               BaseType_t /*priority*/, TaskHandle_t *handle) {
   auto *h = new SimTaskHandle();
   h->name = name ? name : "sim-task";
-  h->thread = std::thread([fn, param, h]() {
+  h->stackUsage->budget = stackDepth;
+  h->thread = std::thread([fn, param, h, usage = h->stackUsage, taskName = h->name]() {
     tl_currentTaskHandle = h;
     h->id = std::this_thread::get_id();
+    volatile char stackAnchor;
+    simStackBegin(usage.get(), taskName,
+                  reinterpret_cast<uintptr_t>(&stackAnchor));
     fn(param);
+    simStackEnd();
   });
   if (handle)
     *handle = h;
@@ -96,6 +101,11 @@ inline void vTaskDelete(TaskHandle_t h) {
     delete h;
   }
 }
-inline unsigned int uxTaskGetStackHighWaterMark(TaskHandle_t) { return 2048; }
+// Zero means unavailable when stack instrumentation is disabled or for main.
+// Instrumented values are sampled host headroom, not device measurements.
+inline unsigned int uxTaskGetStackHighWaterMark(TaskHandle_t h) {
+  if (!h || h == tl_currentTaskHandle) return simStackCurrentMinimumFree();
+  return simStackMinimumFree(h->stackUsage.get());
+}
 inline void vTaskList(char *) {}
 inline void vTaskDelay(int) {}

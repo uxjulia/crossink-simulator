@@ -46,7 +46,7 @@ def _run_simulator(source, target, env):
     ).strip()
     if configured_http_port:
         runtime_env["CROSSPOINT_SIM_HTTP_PORT"] = configured_http_port
-    subprocess.run([binary], cwd=os.getcwd(), env=runtime_env)
+    return subprocess.run([binary], cwd=os.getcwd(), env=runtime_env).returncode
 
 
 target_owner = env.GetProjectOption(RUN_SIMULATOR_TARGET_OWNER_OPTION, "").strip().lower()
