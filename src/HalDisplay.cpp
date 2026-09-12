@@ -319,6 +319,8 @@ static constexpr const char *WINDOW_TITLE =
     "Simulator - Seeed Studio XIAO ePaper Display Board (3.97\")";
 #elif defined(SIMULATOR_DEVICE_X4_PRO)
 static constexpr const char *WINDOW_TITLE = "Simulator - XTEINK X4 Pro";
+#elif defined(SIMULATOR_DEVICE_X4_CLASSIC)
+static constexpr const char *WINDOW_TITLE = "Simulator - XTEINK X4 Classic";
 #elif defined(SIMULATOR_DEVICE_X3)
 static constexpr const char *WINDOW_TITLE = "Simulator - XTEINK X3";
 #else

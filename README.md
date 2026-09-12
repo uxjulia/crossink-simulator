@@ -52,9 +52,12 @@ extend the base simulator environment with one of these flags:
 - `-DSIMULATOR_DEVICE_X4_PRO` keeps the X4 family's 800x480 framebuffer and
   selects the X4 Pro board profile. It exposes touch and swipe input, the
   capacitive Home key, the RTC, display inversion, and frontlight state.
+- `-DSIMULATOR_DEVICE_X4_CLASSIC` keeps the 800x480 framebuffer while selecting
+  the buttons-only X4 Classic profile. It has no touch or frontlight, but keeps
+  the Classic's RTC and USB Drive capabilities.
 
 The sample PlatformIO files include ready-to-use `simulator_x3` and
-`simulator_x4_pro` environments.
+`simulator_x4_pro` and `simulator_x4_classic` environments.
 
 Device-specific simulator implementations belong in this repository. For example, a consuming firmware environment may select Sticky with `-DSIMULATOR_DEVICE_STICKY`, but Sticky mouse-to-touch handling, `BoardConfig` compatibility, and any required HAL or ESP-IDF shims must be implemented and published from `crossink-simulator`. Do not copy those shims into the firmware repository.
 
