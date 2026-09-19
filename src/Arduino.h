@@ -35,13 +35,40 @@ inline void yield() { std::this_thread::yield(); }
 #include "HardwareSerial.h"
 #include "Print.h"
 #include "WString.h"
+#include "esp_heap_caps.h"
 
 struct ESPMock {
-  uint32_t getFreeHeap() { return 1024 * 1024; }
+  uint32_t getFreeHeap() {
+    return static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  }
   void restart();
-  uint32_t getHeapSize() { return 1024 * 1024; }
-  uint32_t getMinFreeHeap() { return 1024 * 1024; }
-  uint32_t getMaxAllocHeap() { return 1024 * 1024; }
+  uint32_t getHeapSize() {
+    return static_cast<uint32_t>(heap_caps_get_total_size(MALLOC_CAP_INTERNAL));
+  }
+  uint32_t getMinFreeHeap() {
+    std::lock_guard<std::mutex> lock(simulator_heap::mutex);
+    simulator_heap::initialize();
+    return static_cast<uint32_t>(simulator_heap::internal.minimumFree);
+  }
+  uint32_t getMaxAllocHeap() {
+    return static_cast<uint32_t>(
+        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+  }
+  uint32_t getFreePsram() {
+    return static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+  }
+  uint32_t getPsramSize() {
+    return static_cast<uint32_t>(heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
+  }
+  uint32_t getMinFreePsram() {
+    std::lock_guard<std::mutex> lock(simulator_heap::mutex);
+    simulator_heap::initialize();
+    return static_cast<uint32_t>(simulator_heap::psram.minimumFree);
+  }
+  uint32_t getMaxAllocPsram() {
+    return static_cast<uint32_t>(
+        heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+  }
 };
 extern ESPMock ESP;
 
