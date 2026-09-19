@@ -1,9 +1,6 @@
 #pragma once
 #include <cstdint>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
-#include <string>
 
 #include "FreeRTOS.h"
 
@@ -26,52 +23,23 @@ inline TaskHandle_t xTaskGetCurrentTaskHandle() {
 
 // Create a real OS thread. The FreeRTOS task function signature is
 // void(*)(void*).
-inline void simulatorReportStackBudget(const char *name,
-                                       const uint32_t stackDepth) {
-  // Host frames and target frames have different ABIs. This records the real
-  // requested FreeRTOS budget and can flag a declared logical-budget breach,
-  // but never pretends to measure ESP32 high-water on macOS/Linux.
-  const char *budgets = std::getenv("CROSSINK_SIMULATOR_STACK_BUDGETS");
-  uint32_t budget = 0;
-  if (budgets) {
-    const char *entry = budgets;
-    const size_t nameLength = std::strlen(name);
-    while (*entry) {
-      if (std::strncmp(entry, name, nameLength) == 0 &&
-          entry[nameLength] == '=') {
-        budget = static_cast<uint32_t>(
-            std::strtoul(entry + nameLength + 1, nullptr, 10));
-        break;
-      }
-      entry = std::strchr(entry, ',');
-      if (!entry)
-        break;
-      ++entry;
-    }
-  }
-  std::fprintf(stderr,
-               "SIMSTACK task=%s requested=%u host-depth=unavailable%s%s\n",
-               name, stackDepth, budget ? " budget=" : "",
-               budget ? std::to_string(budget).c_str() : "");
-  std::fflush(stderr);
-  if (budget && stackDepth > budget)
-    std::fprintf(stderr,
-                 "SIMSTACK BUDGET_BREACH task=%s requested=%u budget=%u\n",
-                 name, stackDepth, budget);
-}
-
 inline BaseType_t xTaskCreate(void (*fn)(void *), const char *name,
                               uint32_t stackDepth, void *param,
                               BaseType_t /*priority*/, TaskHandle_t *handle) {
   auto *h = new SimTaskHandle();
   h->name = name ? name : "sim-task";
-  h->requestedStackBytes = stackDepth;
-  simulatorReportStackBudget(h->name, stackDepth);
-  h->thread = std::thread([fn, param, h]() {
-    tl_currentTaskHandle = h;
-    h->id = std::this_thread::get_id();
-    fn(param);
-  });
+  h->stackUsage->budget = stackDepth;
+  simStackCheckTaskBudget(h->name, stackDepth);
+  h->thread =
+      std::thread([fn, param, h, usage = h->stackUsage, taskName = h->name]() {
+        tl_currentTaskHandle = h;
+        h->id = std::this_thread::get_id();
+        volatile char stackAnchor;
+        simStackBegin(usage.get(), taskName,
+                      reinterpret_cast<uintptr_t>(&stackAnchor));
+        fn(param);
+        simStackEnd();
+      });
   if (handle)
     *handle = h;
   return 1; // pdPASS
@@ -136,13 +104,12 @@ inline void vTaskDelete(TaskHandle_t h) {
     delete h;
   }
 }
-inline unsigned int uxTaskGetStackHighWaterMark(TaskHandle_t task) {
-  // This is a compatibility value only; no host-thread depth is reported as a
-  // device stack measurement. Target -fstack-usage and hardware telemetry are
-  // the authoritative stack checks.
-  if (!task)
-    task = xTaskGetCurrentTaskHandle();
-  return task ? task->requestedStackBytes / sizeof(StackType_t) : 0;
+// Zero means unavailable when stack instrumentation is disabled or for main.
+// Instrumented values are sampled host headroom, not device measurements.
+inline unsigned int uxTaskGetStackHighWaterMark(TaskHandle_t h) {
+  if (!h || h == tl_currentTaskHandle)
+    return simStackCurrentMinimumFree();
+  return simStackMinimumFree(h->stackUsage.get());
 }
 inline void vTaskList(char *) {}
 inline void vTaskDelay(int) {}

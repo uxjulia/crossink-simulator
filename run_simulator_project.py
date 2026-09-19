@@ -29,7 +29,7 @@ def run_simulator(source, target, env):
     ).strip()
     if configured_http_port:
         runtime_env["CROSSPOINT_SIM_HTTP_PORT"] = configured_http_port
-    subprocess.run([binary], cwd=os.getcwd(), env=runtime_env)
+    return subprocess.run([binary], cwd=os.getcwd(), env=runtime_env).returncode
 
 
 def run_existing_simulator(source, target, env):
@@ -42,7 +42,7 @@ def run_existing_simulator(source, target, env):
         print(f"Build it first with: pio run -e {env.subst('$PIOENV')}")
         return 1
 
-    subprocess.run([binary], cwd=os.getcwd())
+    return subprocess.run([binary], cwd=os.getcwd()).returncode
 
 
 if not getattr(builtins, RUN_SIMULATOR_TARGET_KEY, False):

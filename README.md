@@ -271,3 +271,71 @@ quality, refresh behaviour, or memory pressure.
 
 > [!WARNING]
 > **Upstream compatibility:** The simulator mirrors interfaces used by Crosspoint. If Crosspoint adds or changes methods in a shared library and the simulator build reaches that code path, the simulator can fail to compile or link until a matching implementation or stub is added here. In many cases this is just a small no-op shim. Open a PR if the change is broadly applicable to CrossPoint-based forks.
+
+## Checking task stack budgets
+
+When a consuming firmware exports `CROSSINK_SIMULATOR_STACK_BUDGETS` (as
+CrossInk's device-resource smoke runner does), every simulated task creation
+logs its requested size and flags an entry that exceeds that profile's declared
+budget. This logical check does not require a special build and remains useful
+for catching a task whose configured ESP32 stack is clearly too large for its
+device profile.
+
+The normal simulator uses desktop threads. To inspect the host call depth inside
+those configured task budgets during QA, add these flags to the **consuming
+firmware environment's** `build_flags` (alongside its existing flags), then
+rebuild that environment:
+
+```ini
+  -DCROSSPOINT_SIM_STACK_CHECK
+  -finstrument-functions
+  -fno-omit-frame-pointer
+  -fno-optimize-sibling-calls
+  -ldl
+```
+
+Apply the flags to the whole environment, including source-built libraries such
+as FreeType, not just to the simulator library. This works with all device
+profiles: the budget comes directly from each firmware `xTaskCreate`,
+`xTaskCreatePinnedToCore`, or `xTaskCreateStatic` call. ESP-IDF expresses these
+budgets in **bytes**, including on C3. Static-task buffers remain unused on the
+host; only their requested byte budget is enforced.
+
+An instrumented build defaults to fail mode. For example, from the firmware
+project:
+
+```sh
+pio run -e x4-pro-simulator -j1
+CROSSPOINT_SIM_STACK_CHECK=fail .pio/build/x4-pro-simulator/program
+```
+
+Every instrumented function entry samples host stack depth, including nested
+calls and fixed-size local arrays. Exceeding a task's budget prints its name,
+used/budget bytes, function/caller addresses, and an ASLR-independent image
+offset for symbolication, then exits with code 86.
+`run_simulator` and `run_simulator_no_build` propagate that failure to PlatformIO.
+Use `CROSSPOINT_SIM_STACK_CHECK=warn` to continue after one warning per task, or
+`off` to disable measurement in that run. Requesting checks in a normal build
+fails at startup with rebuild instructions, rather than silently skipping them.
+
+`uxTaskGetStackHighWaterMark` reports the minimum **sampled host** headroom in
+bytes; zero means exhausted or unavailable (uninstrumented/main thread). Reading
+another task's watermark is synchronized. Desktop threads retain their normal
+OS stack, allowing the checker to print a useful diagnostic without relying on
+OS minimum stack sizes or crashing in the diagnostic itself.
+
+Both checks are diagnostic approximations, not ESP32 emulation. Profile checks
+compare a requested size with a declared device envelope. Host measurements vary
+with ABI, pointers, compiler optimizations, and the instrumentation itself. They
+can produce host-only failures or miss device-only failures. The monitor does
+not measure the SDL/main thread, precompiled system-library peaks, or temporary
+dynamic stack allocations between hooks. Instrumented builds are slower and
+should not be used for performance measurements. Keep device compiler
+stack-frame checks and real hardware stack-watermark testing as separate checks;
+do not raise a device task's budget solely to silence a simulator warning.
+
+Regression probes (no SDL needed):
+
+```sh
+python3 tests/run_stack_check.py
+```
