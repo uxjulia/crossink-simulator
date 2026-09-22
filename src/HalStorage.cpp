@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <limits>
 #include <sstream>
 #include <vector>
@@ -95,6 +96,7 @@ public:
   int fd = -1;
   std::string path;
   DIR *dir = nullptr;
+  size_t directoryPosition = 0;
 
   bool open(const char *p, int flags) {
     path = p;
@@ -168,6 +170,25 @@ size_t HalFile::size() {
 }
 size_t HalFile::fileSize() { return size(); }
 uint64_t HalFile::fileSize64() { return size(); }
+uint32_t HalFile::modificationTime() {
+  if (!impl || impl->fd < 0)
+    return 0;
+  struct stat metadata{};
+  struct tm modified{};
+  if (fstat(impl->fd, &metadata) != 0 ||
+      !localtime_r(&metadata.st_mtime, &modified) || modified.tm_year < 80 ||
+      modified.tm_year > 207)
+    return 0;
+  // Match HalFile's packed FAT date/time, including its two-second precision.
+  const uint32_t date =
+      static_cast<uint32_t>(((modified.tm_year - 80) << 9) |
+                            ((modified.tm_mon + 1) << 5) | modified.tm_mday);
+  const uint32_t time =
+      static_cast<uint32_t>((modified.tm_hour << 11) | (modified.tm_min << 5) |
+                            (modified.tm_sec / 2));
+  return (date << 16) | time;
+}
+
 bool HalFile::seek(size_t pos) {
   if (!impl || impl->fd < 0)
     return false;
@@ -186,6 +207,18 @@ bool HalFile::seekCur(int64_t offset) {
   return lseek(impl->fd, (off_t)offset, SEEK_CUR) >= 0;
 }
 bool HalFile::seekSet(size_t offset) {
+  if (impl && impl->dir) {
+    // libc telldir cookies need not survive closing the DIR stream. Keep a
+    // consumed-entry count instead, so Library's close/reopen traversal works
+    // on macOS as well as Linux. Hardware uses SdFat's native directory offset.
+    rewindDirectory();
+    while (impl->directoryPosition < offset) {
+      if (!readdir(impl->dir))
+        return false;
+      ++impl->directoryPosition;
+    }
+    return true;
+  }
   if (!impl || impl->fd < 0)
     return false;
   return lseek(impl->fd, (off_t)offset, SEEK_SET) >= 0;
@@ -199,6 +232,8 @@ int HalFile::available() const {
   return (int)(end - cur);
 }
 size_t HalFile::position() const {
+  if (impl && impl->dir)
+    return impl->directoryPosition;
   if (!impl || impl->fd < 0)
     return 0;
   off_t pos = lseek(impl->fd, 0, SEEK_CUR);
@@ -244,8 +279,10 @@ bool HalFile::rename(const char *newPath) {
 }
 bool HalFile::isDirectory() const { return impl && impl->isDir(); }
 void HalFile::rewindDirectory() {
-  if (impl && impl->dir)
+  if (impl && impl->dir) {
     rewinddir(impl->dir);
+    impl->directoryPosition = 0;
+  }
 }
 bool HalFile::close() {
   if (!impl)
@@ -267,6 +304,7 @@ HalFile HalFile::openNextFile() {
     struct dirent *entry = readdir(impl->dir);
     if (!entry)
       return HalFile();
+    ++impl->directoryPosition;
     if (entry->d_name[0] == '.')
       continue; // skip . and ..
 
