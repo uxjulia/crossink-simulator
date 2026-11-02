@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <climits>
 #include <csignal>
+#include <netdb.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
@@ -16,6 +17,16 @@ bool wantsIo(SSL *ssl, const int result) {
   return error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE;
 }
 } // namespace
+bool hostResolves(const char *host) {
+  addrinfo hints{};
+  hints.ai_socktype = SOCK_STREAM;
+  addrinfo *addresses = nullptr;
+  if (!host || !*host || getaddrinfo(host, nullptr, &hints, &addresses) != 0)
+    return false;
+  freeaddrinfo(addresses);
+  return true;
+}
+
 SecureClient::~SecureClient() { stop(); }
 bool SecureClient::tls13Available() { return true; }
 void SecureClient::setCACert(const char *pem) {

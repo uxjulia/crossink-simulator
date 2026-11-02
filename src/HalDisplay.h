@@ -18,6 +18,7 @@ public:
   };
 
   // Initialize the display hardware and driver
+  void startBegin() {} // SDL initializes synchronously in begin().
   void begin();
   void begin(bool seamless);
 
@@ -46,6 +47,11 @@ public:
   void waitRefreshComplete();
   bool supportsAsyncRefresh() const;
   bool supportsAsyncGrayscaleBase() const;
+  bool supportsDeferredGrayscaleBase() const { return false; }
+  bool displayGrayscaleBaseAsync(RefreshMode fallback) {
+    displayGrayscaleBase(fallback);
+    return false;
+  }
   void displayWindow(int x, int y, int w, int h);
   void refreshDisplay(RefreshMode mode = RefreshMode::FAST_REFRESH,
                       bool turnOffScreen = false);
