@@ -5,6 +5,11 @@
 
 #include "WString.h"
 
+// Match the Arduino WebSocketsServer public limit used by firmware bookkeeping.
+#ifndef WEBSOCKETS_SERVER_CLIENT_MAX
+#define WEBSOCKETS_SERVER_CLIENT_MAX (5)
+#endif
+
 // Dummy WebSockets object types
 enum WStype_t {
   WStype_DISCONNECTED,
