@@ -5,6 +5,11 @@
 
 #include "WString.h"
 
+#ifndef WEBSOCKETS_SERVER_CLIENT_MAX
+// Simulator callbacks can use the full uint8_t client ID range.
+#define WEBSOCKETS_SERVER_CLIENT_MAX 256
+#endif
+
 // Dummy WebSockets object types
 enum WStype_t {
   WStype_DISCONNECTED,
